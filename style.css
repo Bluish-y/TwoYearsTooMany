@@ -8,6 +8,8 @@ body {
 }
 
 canvas {
+  width: 1140px;   /* bigger display size */
+  height: 960px;
   image-rendering: pixelated;
   border: 4px solid white;
 }

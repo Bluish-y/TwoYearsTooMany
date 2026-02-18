@@ -49,7 +49,7 @@ window.addEventListener("keydown", e => keys[e.key] = true);
 window.addEventListener("keyup", e => keys[e.key] = false);
 
 const sprite = new Image();
-sprite.src = "assets/player.png";
+sprite.src = "assets/player/test_player.png";
 
 /* ================= CAMERA ================= */
 
