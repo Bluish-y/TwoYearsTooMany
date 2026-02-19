@@ -36,7 +36,7 @@ playerSprite.onload = () => {
   playerLoaded = true;
 };
 
-playerSprite.src = "assets/shagun1.png";
+playerSprite.src = "assets/shagun.png";
 
 const bridgeSprite = new Image();
 let bridgeLoaded = false;
