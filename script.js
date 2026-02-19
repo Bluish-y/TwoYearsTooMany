@@ -191,7 +191,7 @@ class Boat {
 
     // position player so feet sit on boat top
     const playerX = this.x - cameraX + this.width/2 - pW/2;
-    const playerY = this.y - 0.3*pH + 5;   // 5px adjustment
+    const playerY = this.y +0*pH + 5;   // 5px adjustment
 
     ctx.drawImage(
       playerSprite,
