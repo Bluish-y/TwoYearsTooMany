@@ -1,175 +1,317 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
-ctx.imageSmoothingEnabled = false;
 
-const TILE = 32;
-const VIEW_WIDTH = 15;
-const VIEW_HEIGHT = 10;
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 
-canvas.width = VIEW_WIDTH * TILE;
-canvas.height = VIEW_HEIGHT * TILE;
+const WORLD_WIDTH = 6000;
+const GROUND_Y = canvas.height * 0.75;
+const GRAVITY = 0.6;
 
-/* ================= MAP ================= */
+let keys = {};
+let score = 0;
+let gameOver = false;
 
-const map = [
-  "############################",
-  "#............T............#",
-  "#............T............#",
-  "#.........................#",
-  "#.....G...................#",
-  "#.........................#",
-  "#............T............#",
-  "#.........................#",
-  "#.........................#",
-  "############################",
-];
+document.addEventListener("keydown", e => keys[e.code] = true);
+document.addEventListener("keyup", e => keys[e.code] = false);
 
-const MAP_W = map[0].length;
-const MAP_H = map.length;
+// Load building sprites
+const buildingImages = [];
+const buildingLayout = [];
+const BUILDING_WIDTH = 90;
 
-/*
-# = tree (wall)
-. = grass
-G = minigame tile
-T = tree
-*/
-
-/* ================= PLAYER ================= */
-
-const player = {
-  x: 5,
-  y: 5,
-  dir: 0, // 0 down,1 left,2 right,3 up
-  frame: 0,
-  moving: false,
-};
-
-const keys = {};
-window.addEventListener("keydown", e => keys[e.key] = true);
-window.addEventListener("keyup", e => keys[e.key] = false);
-
-const sprite = new Image();
-sprite.src = "assets/player/test_player.png";
-
-/* ================= CAMERA ================= */
-
-function getCamera() {
-  let camX = player.x - Math.floor(VIEW_WIDTH / 2);
-  let camY = player.y - Math.floor(VIEW_HEIGHT / 2);
-
-  camX = Math.max(0, Math.min(MAP_W - VIEW_WIDTH, camX));
-  camY = Math.max(0, Math.min(MAP_H - VIEW_HEIGHT, camY));
-
-  return { camX, camY };
+function randomColor() {
+  const palette = [
+    "#B22222",
+    "#8B0000",
+    "#A52A2A",
+    "#D2691E",
+    "#CD5C5C",
+    "#9C3B3B"
+  ];
+  return palette[Math.floor(Math.random() * palette.length)];
 }
 
-/* ================= COLLISION ================= */
-
-function isBlocked(x, y) {
-  if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return true;
-  return map[y][x] === "#" || map[y][x] === "T";
+// Generate layout once
+for (let x = 0; x < WORLD_WIDTH; x += BUILDING_WIDTH) {
+  buildingLayout.push({
+    x,
+    width: BUILDING_WIDTH,
+    height: 180 + Math.random() * 120,
+    color: randomColor(),
+    roofType: Math.floor(Math.random() * 3)
+  });
 }
 
-/* ================= UPDATE ================= */
 
-let moveCooldown = 0;
 
-function update() {
-  if (moveCooldown > 0) {
-    moveCooldown--;
-    return;
-  }
-
-  let nx = player.x;
-  let ny = player.y;
-
-  if (keys["ArrowUp"]) {
-    ny--;
-    player.dir = 3;
-  } else if (keys["ArrowDown"]) {
-    ny++;
-    player.dir = 0;
-  } else if (keys["ArrowLeft"]) {
-    nx--;
-    player.dir = 1;
-  } else if (keys["ArrowRight"]) {
-    nx++;
-    player.dir = 2;
-  } else {
-    player.moving = false;
-    return;
-  }
-
-  if (!isBlocked(nx, ny)) {
-    player.x = nx;
-    player.y = ny;
-    player.moving = true;
-    player.frame = (player.frame + 1) % 3;
-    moveCooldown = 8;
-    checkMinigame();
-  }
+for (let i = 11; i <= 16; i++) {
+  const img = new Image();
+  img.src = `assets/buildings/building${i}.png`;
+  buildingImages.push(img);
 }
 
-/* ================= MINIGAME ================= */
 
-function checkMinigame() {
-  if (map[player.y][player.x] === "G") {
-    alert("Minigame triggered!");
+class Boat {
+  constructor() {
+    this.x = 200;
+    this.y = GROUND_Y - 40;
+    this.width = 60;
+    this.height = 30;
+
+    this.dx = 0;
+    this.dy = 0;
+
+    this.accel = 0.6;
+    this.friction = 0.85;
+
+    this.jumpPower = -13;
+    this.maxJumps = 2;
+    this.jumpsLeft = 2;
   }
-}
 
-/* ================= DRAW ================= */
+  update() {
+    // Horizontal movement
+    if (keys["ArrowRight"] || keys["KeyD"]) this.dx += this.accel;
+    if (keys["ArrowLeft"] || keys["KeyA"]) this.dx -= this.accel;
 
-function drawMap(camX, camY) {
-  for (let y = 0; y < VIEW_HEIGHT; y++) {
-    for (let x = 0; x < VIEW_WIDTH; x++) {
+    this.dx *= this.friction;
+    this.x += this.dx;
 
-      let mapX = x + camX;
-      let mapY = y + camY;
-
-      const tile = map[mapY][mapX];
-
-      if (tile === "#" || tile === "T") {
-        ctx.fillStyle = "#2f5d1c"; // tree
-      } else if (tile === "G") {
-        ctx.fillStyle = "#d4af37"; // special tile
-      } else {
-        ctx.fillStyle = "#4caf50"; // grass
+    // Double jump
+    if ((keys["Space"] || keys["ArrowUp"]) && !this.jumpHeld) {
+      if (this.jumpsLeft > 0) {
+        this.dy = this.jumpPower;
+        this.jumpsLeft--;
       }
+      this.jumpHeld = true;
+    }
 
-      ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
+    if (!(keys["Space"] || keys["ArrowUp"])) {
+      this.jumpHeld = false;
+    }
+
+    // Gravity
+    this.dy += GRAVITY;
+    this.y += this.dy;
+
+    // Ground collision
+    if (this.y >= GROUND_Y - this.height) {
+      this.y = GROUND_Y - this.height;
+      this.dy = 0;
+      this.jumpsLeft = this.maxJumps;
+    }
+
+    this.x = Math.max(0, Math.min(WORLD_WIDTH - this.width, this.x));
+  }
+
+  draw(cameraX) {
+    ctx.fillStyle = "#8B4513";
+    ctx.fillRect(this.x - cameraX, this.y, this.width, this.height);
+
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(this.x - cameraX + 20, this.y - 20, 20, 20);
+  }
+}
+
+class Bridge {
+  constructor(x) {
+    this.width = 120;
+
+    // Always jumpable height range
+    this.height = 50 + Math.random() * 40; // 50–90px
+
+    this.x = x;
+    this.y = GROUND_Y - this.height;
+  }
+
+  draw(cameraX) {
+    ctx.fillStyle = "#444";
+
+    // Solid lower half
+    ctx.fillRect(
+      this.x - cameraX,
+      this.y + this.height / 2,
+      this.width,
+      this.height / 2
+    );
+
+    // Arch
+    ctx.beginPath();
+    ctx.arc(
+      this.x - cameraX + this.width / 2,
+      this.y + this.height / 2,
+      this.width / 2,
+      Math.PI,
+      0
+    );
+    ctx.fill();
+  }
+
+  collides(boat) {
+    return (
+      boat.x < this.x + this.width &&
+      boat.x + boat.width > this.x &&
+      boat.y + boat.height > this.y + this.height / 2
+    );
+  }
+}
+
+class Pancake {
+  constructor(x) {
+    this.size = 20;
+    this.x = x;
+    this.y = GROUND_Y - 150 - Math.random() * 80;
+    this.collected = false;
+  }
+
+  draw(cameraX) {
+    if (this.collected) return;
+
+    ctx.fillStyle = "#F4A460";
+    ctx.beginPath();
+    ctx.arc(this.x - cameraX, this.y, this.size/2, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  check(boat) {
+    if (this.collected) return;
+
+    if (
+      boat.x < this.x + this.size &&
+      boat.x + boat.width > this.x &&
+      boat.y < this.y + this.size &&
+      boat.y + boat.height > this.y
+    ) {
+      this.collected = true;
+      score++;
+      document.getElementById("score").innerText = "Pancakes: " + score;
     }
   }
 }
 
-function drawPlayer(camX, camY) {
-  const screenX = (player.x - camX) * TILE;
-  const screenY = (player.y - camY) * TILE;
+const boat = new Boat();
+let bridges = [];
+let pancakes = [];
 
-  ctx.drawImage(
-    sprite,
-    player.frame * 32,
-    player.dir * 32,
-    32,
-    32,
-    screenX,
-    screenY,
-    TILE,
-    TILE
-  );
+for (let i = 700; i < WORLD_WIDTH; i += 800) {
+  bridges.push(new Bridge(i));
 }
 
-/* ================= LOOP ================= */
+for (let i = 500; i < WORLD_WIDTH; i += 600) {
+  pancakes.push(new Pancake(i));
+}
 
-function loop() {
+function drawWater() {
+  ctx.fillStyle = "#1E90FF";
+  ctx.fillRect(0, GROUND_Y, canvas.width, canvas.height);
+}
+
+function drawBuildings(cameraX) {
+
+  buildingLayout.forEach(b => {
+
+    const drawX = b.x - cameraX * 0.5; // parallax
+
+    // Main body
+    ctx.fillStyle = b.color;
+    ctx.fillRect(drawX, GROUND_Y - b.height, b.width, b.height);
+
+    // Roof styles
+    ctx.fillStyle = "#333";
+
+    if (b.roofType === 0) {
+      // Triangle gable
+      ctx.beginPath();
+      ctx.moveTo(drawX, GROUND_Y - b.height);
+      ctx.lineTo(drawX + b.width / 2, GROUND_Y - b.height - 40);
+      ctx.lineTo(drawX + b.width, GROUND_Y - b.height);
+      ctx.fill();
+    }
+
+    if (b.roofType === 1) {
+      // Step gable
+      for (let i = 0; i < 4; i++) {
+        ctx.fillRect(
+          drawX + i * 10,
+          GROUND_Y - b.height - 10 - i * 10,
+          b.width - i * 20,
+          10
+        );
+      }
+    }
+
+    if (b.roofType === 2) {
+      // Bell gable curve
+      ctx.beginPath();
+      ctx.moveTo(drawX, GROUND_Y - b.height);
+      ctx.quadraticCurveTo(
+        drawX + b.width / 2,
+        GROUND_Y - b.height - 50,
+        drawX + b.width,
+        GROUND_Y - b.height
+      );
+      ctx.fill();
+    }
+
+    // Windows
+    ctx.fillStyle = "#111";
+
+    const rows = Math.floor(b.height / 50);
+    for (let r = 0; r < rows; r++) {
+      ctx.fillRect(
+        drawX + 15,
+        GROUND_Y - b.height + 20 + r * 45,
+        b.width - 30,
+        25
+      );
+    }
+
+    // Outline
+    ctx.strokeStyle = "#000";
+    ctx.strokeRect(drawX, GROUND_Y - b.height, b.width, b.height);
+  });
+}
+
+
+function update() {
+  if (gameOver) return;
+
+  boat.update();
+
+  bridges.forEach(b => {
+    if (b.collides(boat)) {
+      gameOver = true;
+      document.getElementById("gameOver").classList.remove("hidden");
+    }
+  });
+
+  pancakes.forEach(p => p.check(boat));
+}
+
+function draw() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  let cameraX = boat.x - canvas.width/2;
+  cameraX = Math.max(0, Math.min(WORLD_WIDTH - canvas.width, cameraX));
+
+  drawWater();
+  drawBuildings(cameraX);
+
+  bridges.forEach(b => b.draw(cameraX));
+  pancakes.forEach(p => p.draw(cameraX));
+
+  boat.draw(cameraX);
+}
+
+function loop(){
   update();
-
-  const { camX, camY } = getCamera();
-
-  drawMap(camX, camY);
-  drawPlayer(camX, camY);
-
+  draw();
   requestAnimationFrame(loop);
 }
 
-sprite.onload = () => loop();
+document.addEventListener("keydown", e=>{
+  if(e.code==="KeyR" && gameOver) location.reload();
+});
+
+loop();

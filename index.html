@@ -1,18 +1,22 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>2D Pixel Game</title>
-  <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<title>Canal Frogger</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <canvas id="game"></canvas>
-  <div id="minigameUI" class="hidden">
-    <div class="box">
-      <p>Minigame triggered!</p>
-      <button onclick="closeMinigame()">Close</button>
-    </div>
+
+<canvas id="game"></canvas>
+
+<div id="ui">
+  <div id="score">Pancakes: 0</div>
+  <div id="gameOver" class="hidden">
+    <div>Game Over</div>
+    <div>Press R to Restart</div>
   </div>
-  <script src="script.js"></script>
+</div>
+
+<script src="script.js"></script>
 </body>
 </html>

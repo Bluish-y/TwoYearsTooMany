@@ -1,33 +1,24 @@
 body {
   margin: 0;
-  background: black;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100vh;
+  overflow: hidden;
+  background: #87CEEB;
+  font-family: monospace;
 }
 
 canvas {
-  width: 1140px;   /* bigger display size */
-  height: 960px;
+  display: block;
   image-rendering: pixelated;
-  border: 4px solid white;
 }
 
-#minigameUI {
+#ui {
   position: absolute;
-  inset: 0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background: rgba(0,0,0,0.7);
-}
-
-.box {
-  background: white;
-  padding: 20px;
+  top: 10px;
+  left: 10px;
+  color: white;
+  text-shadow: 2px 2px black;
+  font-size: 18px;
 }
 
 .hidden {
-  display: none !important;
+  display: none;
 }
